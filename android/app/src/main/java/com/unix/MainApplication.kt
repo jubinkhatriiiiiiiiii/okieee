@@ -1,4 +1,4 @@
-package com.vega
+package com.unix
 
 import android.app.Application
 import android.content.res.Configuration

@@ -20,8 +20,8 @@
     },
     "production": {
       "android": {
-        "buildType": "aab",
-        "gradleCommand": ":app:bundleRelease"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
       }
     }
   },
@@ -30,7 +30,8 @@
       "android": {
         "serviceAccountKeyPath": "./service-account-key.json",
         "track": "internal",
-        "releaseStatus": "inProgress"
+        "releaseStatus": "inProgress",
+        "rollout": 1.0
       }
     }
   }

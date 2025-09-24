@@ -1,26 +1,37 @@
 import {create} from 'zustand';
 import {persist, createJSONStorage} from 'zustand/middleware';
 import {MMKVLoader} from 'react-native-mmkv-storage';
-// import {ProvidersList, providersList} from '../constants';
 import {extensionStorage, ProviderExtension} from '../storage/extensionStorage';
 
 const storage = new MMKVLoader().initialize();
 
 export interface Content {
-  provider: ProviderExtension;
-  setProvider: (type: ProviderExtension) => void;
-  // Extension-based provider management
+  // Multi-provider system - no single provider selection
   installedProviders: ProviderExtension[];
   availableProviders: ProviderExtension[];
   setInstalledProviders: (providers: ProviderExtension[]) => void;
   setAvailableProviders: (providers: ProviderExtension[]) => void;
+
+  // Legacy provider field for backward compatibility (will be removed)
+  provider: ProviderExtension;
+  setProvider: (type: ProviderExtension) => void;
   activeExtensionProvider: ProviderExtension | null;
   setActiveExtensionProvider: (provider: ProviderExtension | null) => void;
+
+  // Multi-provider helpers
+  getAllProviderValues: () => string[];
+  getActiveProviders: () => ProviderExtension[];
 }
 
 const useContentStore = create<Content>()(
   persist(
-    (set, _get) => ({
+    (set, get) => ({
+      installedProviders: extensionStorage
+        .getInstalledProviders()
+        .sort((a, b) => a.display_name.localeCompare(b.display_name)),
+      availableProviders: [],
+
+      // Legacy provider field - keeping for backward compatibility
       provider: {
         value: '',
         display_name: '',
@@ -32,10 +43,6 @@ const useContentStore = create<Content>()(
         installedAt: 0,
         lastUpdated: 0,
       },
-      installedProviders: extensionStorage
-        .getInstalledProviders()
-        .sort((a, b) => a.display_name.localeCompare(b.display_name)),
-      availableProviders: [],
       activeExtensionProvider: null,
 
       setProvider: (provider: ProviderExtension) => set({provider}),
@@ -52,10 +59,23 @@ const useContentStore = create<Content>()(
 
       setActiveExtensionProvider: (provider: ProviderExtension | null) =>
         set({activeExtensionProvider: provider}),
+
+      // Multi-provider helpers
+      getAllProviderValues: () => {
+        const { installedProviders } = get();
+        return installedProviders.map(p => p.value);
+      },
+
+      getActiveProviders: () => {
+        const { installedProviders } = get();
+        // For now, all installed providers are considered active
+        // This can be extended later to support disabling specific providers
+        return installedProviders;
+      },
     }),
     {
       name: 'content-storage',
-      storage: createJSONStorage(() => storage as any), // Only persist certain fields
+      storage: createJSONStorage(() => storage as any),
       partialize: state => ({
         provider: state.provider,
         activeExtensionProvider: state.activeExtensionProvider,

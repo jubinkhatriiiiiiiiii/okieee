@@ -5,22 +5,18 @@ import {
   TouchableOpacity,
   TouchableNativeFeedback,
   ScrollView,
-  Dimensions,
 } from 'react-native';
-import React, {useCallback, useMemo} from 'react';
+import React, {useCallback} from 'react';
 import {
   settingsStorage,
   cacheStorageService,
-  ProviderExtension,
 } from '../../lib/storage';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-import useContentStore from '../../lib/zustand/contentStore';
 import {socialLinks} from '../../lib/constants';
 import {
   NativeStackScreenProps,
-  NativeStackNavigationProp,
 } from '@react-navigation/native-stack';
-import {SettingsStackParamList, TabStackParamList} from '../../App';
+import {SettingsStackParamList} from '../../App';
 import {
   MaterialCommunityIcons,
   AntDesign,
@@ -30,75 +26,12 @@ import {
 import useThemeStore from '../../lib/zustand/themeStore';
 import useWatchHistoryStore from '../../lib/zustand/watchHistrory';
 import Animated, {FadeInDown, FadeInUp, Layout} from 'react-native-reanimated';
-import {useNavigation} from '@react-navigation/native';
-import RenderProviderFlagIcon from '../../components/RenderProviderFLagIcon';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'Settings'>;
 
 const Settings = ({navigation}: Props) => {
-  const tabNavigation =
-    useNavigation<NativeStackNavigationProp<TabStackParamList>>();
   const {primary} = useThemeStore(state => state);
-  const {provider, setProvider, installedProviders} = useContentStore(
-    state => state,
-  );
   const {clearHistory} = useWatchHistoryStore(state => state);
-
-  const handleProviderSelect = useCallback(
-    (item: ProviderExtension) => {
-      setProvider(item);
-      // Add haptic feedback
-      if (settingsStorage.isHapticFeedbackEnabled()) {
-        ReactNativeHapticFeedback.trigger('virtualKey', {
-          enableVibrateFallback: true,
-          ignoreAndroidSystemSettings: false,
-        });
-      }
-      // Navigate to home screen
-      tabNavigation.navigate('HomeStack');
-    },
-    [setProvider, tabNavigation],
-  );
-
-  const renderProviderItem = useCallback(
-    (item: ProviderExtension, isSelected: boolean) => (
-      <TouchableOpacity
-        key={item.value}
-        onPress={() => handleProviderSelect(item)}
-        className={`mr-3 rounded-lg ${
-          isSelected ? 'bg-[#333333]' : 'bg-[#262626]'
-        }`}
-        style={{
-          width: Dimensions.get('window').width * 0.3, // Shows 2.5 items
-          height: 65, // Increased height
-          borderWidth: 1.5,
-          borderColor: isSelected ? primary : '#333333',
-        }}>
-        <View className="flex-col items-center justify-center h-full p-2">
-          <RenderProviderFlagIcon type={item.type} />
-          <Text
-            numberOfLines={1}
-            className="text-white text-xs font-medium text-center mt-2">
-            {item.display_name}
-          </Text>
-          {isSelected && (
-            <Text style={{position: 'absolute', top: 6, right: 6}}>
-              <MaterialIcons name="check-circle" size={16} color={primary} />
-            </Text>
-          )}
-        </View>
-      </TouchableOpacity>
-    ),
-    [handleProviderSelect, primary],
-  );
-
-  const providersList = useMemo(
-    () =>
-      installedProviders.map(item =>
-        renderProviderItem(item, provider.value === item.value),
-      ),
-    [installedProviders, provider.value, renderProviderItem],
-  );
 
   const clearCacheHandler = useCallback(() => {
     if (settingsStorage.isHapticFeedbackEnabled()) {
@@ -152,47 +85,7 @@ const Settings = ({navigation}: Props) => {
           <Text className="text-2xl font-bold text-white mb-6">Settings</Text>
         </Animated.View>
 
-        {/* Content provider section */}
-        <AnimatedSection delay={100}>
-          <View className="mb-6 flex-col gap-3">
-            <Text className="text-gray-400 text-sm mb-1">Content Provider</Text>
-            <View className="bg-[#1A1A1A] rounded-xl py-4">
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{
-                  paddingHorizontal: 10,
-                }}>
-                {providersList}
-                {installedProviders.length === 0 && (
-                  <Text className="text-gray-500 text-sm">
-                    No providers installed
-                  </Text>
-                )}
-              </ScrollView>
-            </View>
-            {/* Extensions */}
-            <View className="bg-[#1A1A1A] rounded-xl overflow-hidden mb-3">
-              <TouchableNativeFeedback
-                onPress={() => navigation.navigate('Extensions')}
-                background={TouchableNativeFeedback.Ripple('#333333', false)}>
-                <View className="flex-row items-center justify-between p-4">
-                  <View className="flex-row items-center">
-                    <MaterialCommunityIcons
-                      name="puzzle"
-                      size={22}
-                      color={primary}
-                    />
-                    <Text className="text-white ml-3 text-base">
-                      Provider Manager
-                    </Text>
-                  </View>
-                  <Feather name="chevron-right" size={20} color="gray" />
-                </View>
-              </TouchableNativeFeedback>
-            </View>
-          </View>
-        </AnimatedSection>
+
 
         {/* Main options section */}
         <AnimatedSection delay={200}>
@@ -331,51 +224,47 @@ const Settings = ({navigation}: Props) => {
           </View>
         </AnimatedSection>
 
-        {/* About & GitHub section */}
+        {/* About & Contact section */}
         <AnimatedSection delay={400}>
           <View className="mb-6">
             <Text className="text-gray-400 text-sm mb-3">About</Text>
             <View className="bg-[#1A1A1A] rounded-xl overflow-hidden">
-              {/* About */}
+              {/* About Us */}
               <TouchableNativeFeedback
-                onPress={() => navigation.navigate('About')}
+                onPress={() => navigation.navigate('AboutUs')}
                 background={TouchableNativeFeedback.Ripple('#333333', false)}>
                 <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
                   <View className="flex-row items-center">
                     <Feather name="info" size={22} color={primary} />
-                    <Text className="text-white ml-3 text-base">About</Text>
+                    <Text className="text-white ml-3 text-base">About Us</Text>
                   </View>
                   <Feather name="chevron-right" size={20} color="gray" />
                 </View>
               </TouchableNativeFeedback>
 
-              {/* GitHub */}
+              {/* Help */}
               <TouchableNativeFeedback
-                onPress={() => Linking.openURL(socialLinks.github)}
+                onPress={() => navigation.navigate('Help')}
                 background={TouchableNativeFeedback.Ripple('#333333', false)}>
                 <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
                   <View className="flex-row items-center">
-                    <AntDesign name="github" size={22} color={primary} />
-                    <Text className="text-white ml-3 text-base">
-                      Give a star ⭐
-                    </Text>
+                    <MaterialIcons name="help-outline" size={22} color={primary} />
+                    <Text className="text-white ml-3 text-base">Help & Support</Text>
                   </View>
-                  <Feather name="external-link" size={20} color="gray" />
+                  <Feather name="chevron-right" size={20} color="gray" />
                 </View>
               </TouchableNativeFeedback>
 
-              {/* sponsore */}
+              {/* Contact with us */}
               <TouchableNativeFeedback
-                onPress={() => Linking.openURL(socialLinks.sponsor)}
+                onPress={() => navigation.navigate('ContactUs')}
                 background={TouchableNativeFeedback.Ripple('#333333', false)}>
                 <View className="flex-row items-center justify-between p-4">
                   <View className="flex-row items-center">
-                    <AntDesign name="heart" size={22} color="#ff69b4" />
-                    <Text className="text-white ml-3 text-base">
-                      Sponsor Project
-                    </Text>
+                    <MaterialCommunityIcons name="email" size={22} color={primary} />
+                    <Text className="text-white ml-3 text-base">Contact with us</Text>
                   </View>
-                  <Feather name="external-link" size={20} color="gray" />
+                  <Feather name="chevron-right" size={20} color="gray" />
                 </View>
               </TouchableNativeFeedback>
             </View>

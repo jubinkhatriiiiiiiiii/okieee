@@ -22,8 +22,8 @@ import {DrawerLayout} from 'react-native-gesture-handler';
 import {useHeroMetadata} from '../lib/hooks/useHomePageData';
 
 interface HeroProps {
-  isDrawerOpen: boolean;
-  drawerRef: React.RefObject<DrawerLayout>;
+  isDrawerOpen?: boolean;
+  drawerRef?: React.RefObject<DrawerLayout>;
 }
 
 const Hero = memo(({isDrawerOpen, drawerRef}: HeroProps) => {
@@ -139,7 +139,7 @@ const Hero = memo(({isDrawerOpen, drawerRef}: HeroProps) => {
             }`}>
             <Pressable
               className={`${isDrawerOpen ? 'opacity-0' : 'opacity-100'}`}
-              onPress={() => drawerRef.current?.openDrawer()}>
+              onPress={() => drawerRef?.current?.openDrawer()}>
               <Ionicons name="menu-sharp" size={27} color="white" />
             </Pressable>
           </View>

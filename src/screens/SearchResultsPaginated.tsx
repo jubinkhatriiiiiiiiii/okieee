@@ -14,6 +14,7 @@ import {SearchStackParamList} from '../App';
 import useThemeStore from '../lib/zustand/themeStore';
 import {providerManager} from '../lib/services/ProviderManager';
 import useContentStore from '../lib/zustand/contentStore';
+import {MaterialIcons} from '@expo/vector-icons';
 
 type Props = NativeStackScreenProps<SearchStackParamList, 'SearchResults'>;
 
@@ -51,14 +52,14 @@ const useDebounce = (value: string, delay: number) => {
   return debouncedValue;
 };
 
-const PROVIDERS_PER_BATCH = 3; // Show 3 providers initially, then 3 more each time
+const PROVIDERS_PER_PAGE = 3; // Show 3 providers per page
 
-const SearchResults = React.memo(({route}: Props): React.ReactElement => {
+const SearchResultsPaginated = React.memo(({route}: Props): React.ReactElement => {
   const {primary} = useThemeStore(state => state);
   const {installedProviders} = useContentStore(state => state);
   const [searchData, setSearchData] = useState<SearchPageData[]>([]);
   const [loading, setLoading] = useState<LoadingState[]>([]);
-  const [visibleBatches, setVisibleBatches] = useState(1); // Start with 1 batch (3 providers)
+  const [currentPage, setCurrentPage] = useState(1);
   const abortController = useRef<AbortController | null>(null);
   const searchStartTime = useRef<number>(0);
 
@@ -105,19 +106,19 @@ const SearchResults = React.memo(({route}: Props): React.ReactElement => {
     [loading],
   );
 
-  // Calculate total number of batches needed
-  const totalBatches = useMemo(() => {
+  // Calculate total number of pages needed
+  const totalPages = useMemo(() => {
     const providersWithResults = searchData.filter(item => {
       const loadingState = loading.find(l => l.value === item.value);
       const hasResults = item.Posts && item.Posts.length > 0;
       return loadingState?.isLoading || hasResults;
     });
 
-    return Math.ceil(providersWithResults.length / PROVIDERS_PER_BATCH);
+    return Math.ceil(providersWithResults.length / PROVIDERS_PER_PAGE);
   }, [searchData, loading]);
 
-  // Memoize combined data for rendering - only show current batch of providers
-  const combinedData = useMemo(() => {
+  // Memoize current page data for rendering
+  const currentPageData = useMemo(() => {
     // Only show providers that have results or are still loading
     const providersWithResults = searchData.filter(item => {
       const loadingState = loading.find(l => l.value === item.value);
@@ -139,29 +140,38 @@ const SearchResults = React.memo(({route}: Props): React.ReactElement => {
       return a.name.localeCompare(b.name);
     });
 
-    // Show only the current batch of providers
-    const startIndex = 0;
-    const endIndex = visibleBatches * PROVIDERS_PER_BATCH;
+    // Show only the current page of providers
+    const startIndex = (currentPage - 1) * PROVIDERS_PER_PAGE;
+    const endIndex = currentPage * PROVIDERS_PER_PAGE;
     return sortedProviders.slice(startIndex, endIndex);
-  }, [searchData, loading, visibleBatches]);
+  }, [searchData, loading, currentPage]);
 
-  // Check if there are more results to show
-  const hasMoreResults = useMemo(() => {
+  // Check if there are more pages
+  const hasNextPage = useMemo(() => {
     const providersWithResults = searchData.filter(item => {
       const loadingState = loading.find(l => l.value === item.value);
       const hasResults = item.Posts && item.Posts.length > 0;
       return loadingState?.isLoading || hasResults;
     });
 
-    return providersWithResults.length > visibleBatches * PROVIDERS_PER_BATCH;
-  }, [searchData, loading, visibleBatches]);
+    return providersWithResults.length > currentPage * PROVIDERS_PER_PAGE;
+  }, [searchData, loading, currentPage]);
 
-  // Load more results handler
-  const loadMoreResults = useCallback(() => {
-    if (hasMoreResults) {
-      setVisibleBatches(prev => prev + 1);
+  // Check if there are previous pages
+  const hasPreviousPage = useMemo(() => currentPage > 1, [currentPage]);
+
+  // Navigation handlers
+  const goToNextPage = useCallback(() => {
+    if (hasNextPage) {
+      setCurrentPage(prev => prev + 1);
     }
-  }, [hasMoreResults]);
+  }, [hasNextPage]);
+
+  const goToPreviousPage = useCallback(() => {
+    if (hasPreviousPage) {
+      setCurrentPage(prev => prev - 1);
+    }
+  }, [hasPreviousPage]);
 
   // Performance monitoring
   const logPerformance = useCallback((message: string) => {
@@ -182,7 +192,7 @@ const SearchResults = React.memo(({route}: Props): React.ReactElement => {
     // Reset states when component mounts or filter changes
     setSearchData([]);
     setLoading(trueLoading);
-    setVisibleBatches(1); // Reset to first batch
+    setCurrentPage(1); // Reset to first page
     searchStartTime.current = Date.now();
 
     const getSearchResults = async () => {
@@ -336,39 +346,112 @@ const SearchResults = React.memo(({route}: Props): React.ReactElement => {
     );
   }, [isAllLoaded, primary, loading]);
 
-  // Memoize "More Results" button
-  const moreResultsButton = useMemo(() => {
-    if (!isAllLoaded || !hasMoreResults) return null;
-
-    const providersWithResults = searchData.filter(item => {
-      const loadingState = loading.find(l => l.value === item.value);
-      const hasResults = item.Posts && item.Posts.length > 0;
-      return loadingState?.isLoading || hasResults;
-    });
-
-    const remainingCount = providersWithResults.length - (visibleBatches * PROVIDERS_PER_BATCH);
-    const nextBatchSize = Math.min(remainingCount, PROVIDERS_PER_BATCH);
+  // Memoize pagination controls
+  const paginationControls = useMemo(() => {
+    if (totalPages <= 1) return null;
 
     return (
-      <TouchableOpacity
-        onPress={loadMoreResults}
-        style={{
-          backgroundColor: primary + '20',
-          borderWidth: 1,
-          borderColor: primary + '40',
-          paddingHorizontal: 24,
-          paddingVertical: 12,
-          borderRadius: 8,
-          marginHorizontal: 16,
-          marginVertical: 16,
+      <View style={{
+        marginHorizontal: 16,
+        marginVertical: 8,
+      }}>
+        {/* Page Indicator */}
+        <View style={{
           alignItems: 'center',
+          marginBottom: 12,
+          paddingVertical: 6,
+          paddingHorizontal: 12,
+          backgroundColor: '#1F1F1F',
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: '#333333',
         }}>
-        <Text style={{color: primary, fontSize: 16, fontWeight: '600'}}>
-          More Results ({nextBatchSize} providers)
-        </Text>
-      </TouchableOpacity>
+          <Text style={{
+            color: primary,
+            fontSize: 14,
+            fontWeight: '600',
+          }}>
+            Page {currentPage} of {totalPages}
+          </Text>
+          <Text style={{
+            color: '#9CA3AF',
+            fontSize: 11,
+            marginTop: 1,
+          }}>
+            {currentPage * PROVIDERS_PER_PAGE - PROVIDERS_PER_PAGE + 1} - {Math.min(currentPage * PROVIDERS_PER_PAGE, searchData.length)} of {searchData.length} providers
+          </Text>
+        </View>
+
+        {/* Navigation Buttons */}
+        <View style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 12,
+        }}>
+          <TouchableOpacity
+            onPress={goToPreviousPage}
+            disabled={!hasPreviousPage}
+            style={{
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              backgroundColor: hasPreviousPage ? primary + '20' : '#2A2A2A',
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: hasPreviousPage ? primary + '40' : '#404040',
+            }}>
+            <MaterialIcons
+              name="chevron-left"
+              size={18}
+              color={hasPreviousPage ? primary : '#666'}
+            />
+            <Text style={{
+              color: hasPreviousPage ? primary : '#666',
+              fontSize: 13,
+              fontWeight: '500',
+              marginLeft: 4,
+            }}>
+              Previous
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={goToNextPage}
+            disabled={!hasNextPage}
+            style={{
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              backgroundColor: hasNextPage ? primary + '20' : '#2A2A2A',
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: hasNextPage ? primary + '40' : '#404040',
+            }}>
+            <Text style={{
+              color: hasNextPage ? primary : '#666',
+              fontSize: 13,
+              fontWeight: '500',
+              marginRight: 4,
+            }}>
+              Next
+            </Text>
+            <MaterialIcons
+              name="chevron-right"
+              size={18}
+              color={hasNextPage ? primary : '#666'}
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
     );
-  }, [isAllLoaded, hasMoreResults, loadMoreResults, primary, searchData, loading, visibleBatches]);
+  }, [totalPages, currentPage, hasPreviousPage, hasNextPage, goToPreviousPage, goToNextPage, primary, searchData.length]);
 
   return (
     <SafeAreaView style={{backgroundColor: 'black', flex: 1, width: '100%'}}>
@@ -382,9 +465,9 @@ const SearchResults = React.memo(({route}: Props): React.ReactElement => {
         </View>
 
         <View style={{paddingHorizontal: 16}}>
-          {combinedData.length > 0 ? (
+          {currentPageData.length > 0 ? (
             <FlatList
-              data={combinedData}
+              data={currentPageData}
               keyExtractor={keyExtractor}
               renderItem={renderItem}
               showsVerticalScrollIndicator={false}
@@ -411,7 +494,7 @@ const SearchResults = React.memo(({route}: Props): React.ReactElement => {
             )
           )}
 
-          {moreResultsButton}
+          {paginationControls}
         </View>
         <View style={{height: 64}} />
       </ScrollView>
@@ -419,4 +502,4 @@ const SearchResults = React.memo(({route}: Props): React.ReactElement => {
   );
 });
 
-export default SearchResults;
+export default SearchResultsPaginated;

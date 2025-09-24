@@ -12,18 +12,13 @@ import {
 } from '@react-navigation/native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import Ionicons from '@expo/vector-icons/Ionicons';
-import Entypo from '@expo/vector-icons/Entypo';
+import {MaterialIcons, MaterialCommunityIcons, Feather, FontAwesome5} from '@expo/vector-icons';
 import 'react-native-reanimated';
 import 'react-native-gesture-handler';
 import WebView from './screens/WebView';
-import SearchResults from './screens/SearchResultsPaginated';
+import SearchResults from './screens/SearchResults';
 import * as SystemUI from 'expo-system-ui';
-// import DisableProviders from './screens/settings/DisableProviders';
 import About, {checkForUpdate} from './screens/settings/About';
-import AboutUs from './screens/settings/AboutUs';
-import ContactUs from './screens/settings/ContactUs';
-import Help from './screens/settings/Help';
 import BootSplash from 'react-native-bootsplash';
 import {enableFreeze, enableScreens} from 'react-native-screens';
 import Preferences from './screens/settings/Preference';
@@ -35,7 +30,7 @@ import TabBarBackgound from './components/TabBarBackgound';
 import {TouchableOpacity} from 'react-native';
 import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 import {StyleProp} from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, {interpolate, useAnimatedStyle, useSharedValue, withSpring} from 'react-native-reanimated';
 import Downloads from './screens/settings/Downloads';
 import SeriesEpisodes from './screens/settings/SeriesEpisodes';
 import WatchHistory from './screens/WatchHistory';
@@ -50,7 +45,9 @@ import {queryClient} from './lib/client';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 import notifee from '@notifee/react-native';
 import notificationService from './lib/services/Notification';
-import {PermissionService} from './lib/services/PermissionService';
+import {BlurView} from 'expo-blur';
+import LinearGradient from 'react-native-linear-gradient';
+
 // Lazy-load Firebase modules so app runs without google-services files
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const getAnalytics = (): any | null => {
@@ -150,9 +147,6 @@ export type SettingsStackParamList = {
   Settings: undefined;
   DisableProviders: undefined;
   About: undefined;
-  AboutUs: undefined;
-  ContactUs: undefined;
-  Help: undefined;
   Preferences: undefined;
   Downloads: undefined;
   WatchHistoryStack: undefined;
@@ -166,13 +160,16 @@ export type TabStackParamList = {
   WatchListStack: undefined;
   SettingsStack: undefined;
 };
+
 const Tab = createBottomTabNavigator<TabStackParamList>();
 export const navigationRef = createNavigationContainerRef<RootStackParamList>();
+
 const App = () => {
   LogBox.ignoreLogs([
     'You have passed a style to FlashList',
     'new NativeEventEmitter()',
   ]);
+
   const HomeStack = createNativeStackNavigator<HomeStackParamList>();
   const Stack = createNativeStackNavigator<RootStackParamList>();
   const SearchStack = createNativeStackNavigator<SearchStackParamList>();
@@ -250,8 +247,6 @@ const App = () => {
       .catch(error => {
         console.error('Failed to initialize providers:', error);
       });
-
-    // Initialize PermissionService
 
     // Cleanup on unmount
     return () => {
@@ -345,9 +340,6 @@ const App = () => {
           component={DisableProviders}
         /> */}
         <SettingsStack.Screen name="About" component={About} />
-        <SettingsStack.Screen name="AboutUs" component={AboutUs} />
-        <SettingsStack.Screen name="ContactUs" component={ContactUs} />
-        <SettingsStack.Screen name="Help" component={Help} />
         <SettingsStack.Screen name="Preferences" component={Preferences} />
         <SettingsStack.Screen name="Downloads" component={Downloads} />
         {/* Removed Extensions screen - providers are now auto-managed */}
@@ -362,6 +354,35 @@ const App = () => {
       </SettingsStack.Navigator>
     );
   }
+
+  // Enhanced Tab Bar Icon Component
+  const TabBarIcon = ({focused, color, size, iconName, IconComponent}: {
+    focused: boolean;
+    color: string;
+    size: number;
+    iconName: string;
+    IconComponent: any;
+  }) => {
+    const scale = useSharedValue(focused ? 1.1 : 1);
+
+    useEffect(() => {
+      scale.value = withSpring(focused ? 1.1 : 1, {
+        damping: 15,
+        stiffness: 300,
+      });
+    }, [focused, scale]);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+      transform: [{scale: scale.value}],
+    }));
+
+    return (
+      <Animated.View style={animatedStyle}>
+        <IconComponent name={iconName} color={color} size={size} />
+      </Animated.View>
+    );
+  };
+
   function TabStack() {
     return (
       <Tab.Navigator
@@ -375,15 +396,15 @@ const App = () => {
           headerShown: false,
           freezeOnBlur: true,
           tabBarActiveTintColor: primary,
-          tabBarInactiveTintColor: '#dadde3',
+          tabBarInactiveTintColor: '#9ca3af',
           tabBarShowLabel: showTabBarLables,
           tabBarStyle: !isLargeScreen
             ? {
                 position: 'absolute',
                 bottom: 0,
-                height: 55,
+                height: 65,
                 borderRadius: 0,
-                // backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                backgroundColor: 'transparent',
                 overflow: 'hidden',
                 elevation: 0,
                 borderTopWidth: 0,
@@ -391,7 +412,22 @@ const App = () => {
                 paddingTop: 5,
               }
             : {},
-          tabBarBackground: () => <TabBarBackgound />,
+          tabBarBackground: () => (
+            <BlurView
+              intensity={90}
+              experimentalBlurMethod="dimezisBlurView"
+              blurReductionFactor={5}
+              tint="dark"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+              }}
+            />
+          ),
           tabBarHideOnKeyboard: true,
           tabBarButton: props => {
             return (
@@ -422,16 +458,13 @@ const App = () => {
           options={{
             title: 'Home',
             tabBarIcon: ({focused, color, size}) => (
-              <Animated.View
-                style={{
-                  transform: [{scale: focused ? 1.1 : 1}],
-                }}>
-                {focused ? (
-                  <Ionicons name="home" color={color} size={size} />
-                ) : (
-                  <Ionicons name="home-outline" color={color} size={size} />
-                )}
-              </Animated.View>
+              <TabBarIcon
+                focused={focused}
+                color={color}
+                size={size}
+                iconName="home"
+                IconComponent={MaterialIcons}
+              />
             ),
           }}
         />
@@ -441,16 +474,13 @@ const App = () => {
           options={{
             title: 'Search',
             tabBarIcon: ({focused, color, size}) => (
-              <Animated.View
-                style={{
-                  transform: [{scale: focused ? 1.1 : 1}],
-                }}>
-                {focused ? (
-                  <Ionicons name="search" color={color} size={size} />
-                ) : (
-                  <Ionicons name="search-outline" color={color} size={size} />
-                )}
-              </Animated.View>
+              <TabBarIcon
+                focused={focused}
+                color={color}
+                size={size}
+                iconName="search"
+                IconComponent={MaterialIcons}
+              />
             ),
           }}
         />
@@ -460,16 +490,13 @@ const App = () => {
           options={{
             title: 'Watch List',
             tabBarIcon: ({focused, color, size}) => (
-              <Animated.View
-                style={{
-                  transform: [{scale: focused ? 1.1 : 1}],
-                }}>
-                {focused ? (
-                  <Entypo name="folder-video" color={color} size={size} />
-                ) : (
-                  <Entypo name="folder-video" color={color} size={size} />
-                )}
-              </Animated.View>
+              <TabBarIcon
+                focused={focused}
+                color={color}
+                size={size}
+                iconName="video-library"
+                IconComponent={MaterialIcons}
+              />
             ),
           }}
         />
@@ -479,16 +506,13 @@ const App = () => {
           options={{
             title: 'Settings',
             tabBarIcon: ({focused, color, size}) => (
-              <Animated.View
-                style={{
-                  transform: [{scale: focused ? 1.1 : 1}],
-                }}>
-                {focused ? (
-                  <Ionicons name="settings" color={color} size={size} />
-                ) : (
-                  <Ionicons name="settings-outline" color={color} size={size} />
-                )}
-              </Animated.View>
+              <TabBarIcon
+                focused={focused}
+                color={color}
+                size={size}
+                iconName="settings"
+                IconComponent={MaterialIcons}
+              />
             ),
           }}
         />

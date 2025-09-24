@@ -17,13 +17,10 @@ import Entypo from '@expo/vector-icons/Entypo';
 import 'react-native-reanimated';
 import 'react-native-gesture-handler';
 import WebView from './screens/WebView';
-import SearchResults from './screens/SearchResultsPaginated';
+import SearchResults from './screens/SearchResults';
 import * as SystemUI from 'expo-system-ui';
 // import DisableProviders from './screens/settings/DisableProviders';
 import About, {checkForUpdate} from './screens/settings/About';
-import AboutUs from './screens/settings/AboutUs';
-import ContactUs from './screens/settings/ContactUs';
-import Help from './screens/settings/Help';
 import BootSplash from 'react-native-bootsplash';
 import {enableFreeze, enableScreens} from 'react-native-screens';
 import Preferences from './screens/settings/Preference';
@@ -50,7 +47,6 @@ import {queryClient} from './lib/client';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 import notifee from '@notifee/react-native';
 import notificationService from './lib/services/Notification';
-import {PermissionService} from './lib/services/PermissionService';
 // Lazy-load Firebase modules so app runs without google-services files
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const getAnalytics = (): any | null => {
@@ -150,9 +146,6 @@ export type SettingsStackParamList = {
   Settings: undefined;
   DisableProviders: undefined;
   About: undefined;
-  AboutUs: undefined;
-  ContactUs: undefined;
-  Help: undefined;
   Preferences: undefined;
   Downloads: undefined;
   WatchHistoryStack: undefined;
@@ -251,8 +244,6 @@ const App = () => {
         console.error('Failed to initialize providers:', error);
       });
 
-    // Initialize PermissionService
-
     // Cleanup on unmount
     return () => {
       updateProvidersService.stopAutomaticUpdateCheck();
@@ -345,9 +336,6 @@ const App = () => {
           component={DisableProviders}
         /> */}
         <SettingsStack.Screen name="About" component={About} />
-        <SettingsStack.Screen name="AboutUs" component={AboutUs} />
-        <SettingsStack.Screen name="ContactUs" component={ContactUs} />
-        <SettingsStack.Screen name="Help" component={Help} />
         <SettingsStack.Screen name="Preferences" component={Preferences} />
         <SettingsStack.Screen name="Downloads" component={Downloads} />
         {/* Removed Extensions screen - providers are now auto-managed */}
@@ -513,7 +501,8 @@ const App = () => {
               left: 'off',
               bottom: 'additive',
             }}
-            style={{backgroundColor: 'black', flex: 1}}>
+            className="flex-1"
+            style={{backgroundColor: 'black'}}>
             <NavigationContainer
               ref={navigationRef}
               onReady={async () => {

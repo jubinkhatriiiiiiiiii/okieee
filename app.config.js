@@ -44,15 +44,7 @@ module.exports = () => {
         },
       },
     ],
-    [
-      'react-native-bootsplash',
-      {
-        assetsDir: 'assets/bootsplash',
-        android: {
-          parentTheme: 'EdgeToEdge',
-        },
-      },
-    ],
+
     [
       'expo-build-properties',
       {
@@ -86,12 +78,10 @@ module.exports = () => {
 
   return {
     expo: {
-      name: 'Vega',
-      displayName: 'Vega',
       newArchEnabled: true,
       autolinking: {exclude: ['expo-splash-screen']},
       plugins,
-      slug: 'vega',
+      slug: 'unix',
       version: '3.2.4',
       sdkVersion: '52.0.0',
       userInterfaceStyle: 'dark',
@@ -101,7 +91,7 @@ module.exports = () => {
           : {}),
         minSdkVersion: 24,
         edgeToEdgeEnabled: true,
-        package: 'com.vega',
+        package: 'com.unix',
         versionCode: 152,
         permissions: [
           'FOREGROUND_SERVICE',
@@ -118,7 +108,7 @@ module.exports = () => {
           {name: 'WRITE_EXTERNAL_STORAGE', maxSdkVersion: 32},
         ],
         intentFilters: [
-          {action: 'VIEW', category: 'BROWSABLE', data: {scheme: 'com.vega'}},
+          {action: 'VIEW', category: 'BROWSABLE', data: {scheme: 'com.unix'}},
         ],
         queries: [
           {action: 'VIEW', data: {scheme: 'http'}},

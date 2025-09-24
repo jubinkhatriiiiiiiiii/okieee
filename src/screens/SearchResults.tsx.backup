@@ -5,7 +5,6 @@ import {
   Text,
   View,
   FlatList,
-  TouchableOpacity,
 } from 'react-native';
 import Slider from '../components/Slider';
 import React, {useEffect, useState, useRef, useCallback, useMemo} from 'react';
@@ -51,19 +50,16 @@ const useDebounce = (value: string, delay: number) => {
   return debouncedValue;
 };
 
-const PROVIDERS_PER_BATCH = 3; // Show 3 providers initially, then 3 more each time
-
 const SearchResults = React.memo(({route}: Props): React.ReactElement => {
   const {primary} = useThemeStore(state => state);
   const {installedProviders} = useContentStore(state => state);
   const [searchData, setSearchData] = useState<SearchPageData[]>([]);
   const [loading, setLoading] = useState<LoadingState[]>([]);
-  const [visibleBatches, setVisibleBatches] = useState(1); // Start with 1 batch (3 providers)
   const abortController = useRef<AbortController | null>(null);
   const searchStartTime = useRef<number>(0);
 
   // Debounce the search filter to prevent excessive API calls
-  const debouncedFilter = useDebounce(route.params.filter, 200);
+  const debouncedFilter = useDebounce(route.params.filter, 200); // Reduced from 300ms
 
   // Memoize loading states more efficiently
   const trueLoading = useMemo(
@@ -105,28 +101,19 @@ const SearchResults = React.memo(({route}: Props): React.ReactElement => {
     [loading],
   );
 
-  // Calculate total number of batches needed
-  const totalBatches = useMemo(() => {
-    const providersWithResults = searchData.filter(item => {
-      const loadingState = loading.find(l => l.value === item.value);
-      const hasResults = item.Posts && item.Posts.length > 0;
-      return loadingState?.isLoading || hasResults;
-    });
-
-    return Math.ceil(providersWithResults.length / PROVIDERS_PER_BATCH);
-  }, [searchData, loading]);
-
-  // Memoize combined data for rendering - only show current batch of providers
+  // Memoize combined data for rendering - only show providers with results
   const combinedData = useMemo(() => {
     // Only show providers that have results or are still loading
     const providersWithResults = searchData.filter(item => {
       const loadingState = loading.find(l => l.value === item.value);
       const hasResults = item.Posts && item.Posts.length > 0;
+
+      // Show if loading or has results
       return loadingState?.isLoading || hasResults;
     });
 
-    // Sort providers by loading state first, then by whether they have results
-    const sortedProviders = providersWithResults.sort((a, b) => {
+    return providersWithResults.sort((a, b) => {
+      // Sort by loading state first, then by whether they have results
       const aLoading = loading.find(l => l.value === a.value)?.isLoading || false;
       const bLoading = loading.find(l => l.value === b.value)?.isLoading || false;
       const aHasResults = a.Posts && a.Posts.length > 0;
@@ -138,30 +125,7 @@ const SearchResults = React.memo(({route}: Props): React.ReactElement => {
       if (!aHasResults && bHasResults) return 1;
       return a.name.localeCompare(b.name);
     });
-
-    // Show only the current batch of providers
-    const startIndex = 0;
-    const endIndex = visibleBatches * PROVIDERS_PER_BATCH;
-    return sortedProviders.slice(startIndex, endIndex);
-  }, [searchData, loading, visibleBatches]);
-
-  // Check if there are more results to show
-  const hasMoreResults = useMemo(() => {
-    const providersWithResults = searchData.filter(item => {
-      const loadingState = loading.find(l => l.value === item.value);
-      const hasResults = item.Posts && item.Posts.length > 0;
-      return loadingState?.isLoading || hasResults;
-    });
-
-    return providersWithResults.length > visibleBatches * PROVIDERS_PER_BATCH;
-  }, [searchData, loading, visibleBatches]);
-
-  // Load more results handler
-  const loadMoreResults = useCallback(() => {
-    if (hasMoreResults) {
-      setVisibleBatches(prev => prev + 1);
-    }
-  }, [hasMoreResults]);
+  }, [searchData, loading]);
 
   // Performance monitoring
   const logPerformance = useCallback((message: string) => {
@@ -182,15 +146,14 @@ const SearchResults = React.memo(({route}: Props): React.ReactElement => {
     // Reset states when component mounts or filter changes
     setSearchData([]);
     setLoading(trueLoading);
-    setVisibleBatches(1); // Reset to first batch
     searchStartTime.current = Date.now();
 
     const getSearchResults = async () => {
       // Optimized performance settings
-      const BATCH_SIZE = 2;
-      const REQUEST_TIMEOUT = 10000;
-      const MAX_RESULTS_PER_PROVIDER = 8;
-      const BATCH_DELAY = 100;
+      const BATCH_SIZE = 2; // Increased from 1 for better performance
+      const REQUEST_TIMEOUT = 10000; // Reduced from 15s for faster response
+      const MAX_RESULTS_PER_PROVIDER = 8; // Reduced from 10 for faster processing
+      const BATCH_DELAY = 100; // Reduced from 500ms for faster processing
       const MAX_RETRIES = 2;
 
       const fetchWithTimeout = async (provider: any): Promise<void> => {
@@ -210,8 +173,10 @@ const SearchResults = React.memo(({route}: Props): React.ReactElement => {
               timeoutPromise
             ]);
 
+            // Skip updating state if request was aborted
             if (signal.aborted) return;
 
+            // Limit results to prevent memory issues and improve speed
             const limitedData = data ? data.slice(0, MAX_RESULTS_PER_PROVIDER) : [];
 
             if (limitedData && limitedData.length > 0) {
@@ -242,6 +207,7 @@ const SearchResults = React.memo(({route}: Props): React.ReactElement => {
               error?.message || error,
             );
 
+            // Retry logic for failed requests
             if (attemptNumber < MAX_RETRIES) {
               logPerformance(`🔄 ${provider.display_name}: Retrying (${attemptNumber}/${MAX_RETRIES})`);
               await new Promise(resolve => setTimeout(resolve, 1000 * attemptNumber));
@@ -256,12 +222,15 @@ const SearchResults = React.memo(({route}: Props): React.ReactElement => {
         return attemptFetch();
       };
 
+      // Process providers in optimized batches
       for (let i = 0; i < installedProviders.length; i += BATCH_SIZE) {
         const batch = installedProviders.slice(i, i + BATCH_SIZE);
         const batchPromises = batch.map(fetchWithTimeout);
 
+        // Use Promise.allSettled for better error handling
         await Promise.allSettled(batchPromises);
 
+        // Reduced delay between batches for faster processing
         if (i + BATCH_SIZE < installedProviders.length && !signal.aborted) {
           await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
         }
@@ -270,13 +239,16 @@ const SearchResults = React.memo(({route}: Props): React.ReactElement => {
       logPerformance('🏁 Search completed');
     };
 
+    // Only run search if debounced filter is not empty
     if (debouncedFilter.trim()) {
       getSearchResults();
     } else {
+      // Reset loading state if search is empty
       setLoading(trueLoading.map(item => ({...item, isLoading: false})));
     }
 
     return () => {
+      // Cleanup function: abort any ongoing API requests
       if (abortController.current) {
         abortController.current.abort();
         abortController.current = null;
@@ -323,65 +295,31 @@ const SearchResults = React.memo(({route}: Props): React.ReactElement => {
     const totalCount = loading.length;
 
     return (
-      <View style={{flexDirection: 'row', justifyContent: 'center', alignItems: 'center', height: 80}}>
+      <View className="flex justify-center items-center h-20">
         <ActivityIndicator
           size="small"
           color={primary}
           animating={true}
         />
-        <Text style={{color: '#9CA3AF', fontSize: 12, marginTop: 4, marginLeft: 8}}>
+        <Text className="text-gray-400 text-xs mt-1">
           Searching {loadingCount} of {totalCount} providers...
         </Text>
       </View>
     );
   }, [isAllLoaded, primary, loading]);
 
-  // Memoize "More Results" button
-  const moreResultsButton = useMemo(() => {
-    if (!isAllLoaded || !hasMoreResults) return null;
-
-    const providersWithResults = searchData.filter(item => {
-      const loadingState = loading.find(l => l.value === item.value);
-      const hasResults = item.Posts && item.Posts.length > 0;
-      return loadingState?.isLoading || hasResults;
-    });
-
-    const remainingCount = providersWithResults.length - (visibleBatches * PROVIDERS_PER_BATCH);
-    const nextBatchSize = Math.min(remainingCount, PROVIDERS_PER_BATCH);
-
-    return (
-      <TouchableOpacity
-        onPress={loadMoreResults}
-        style={{
-          backgroundColor: primary + '20',
-          borderWidth: 1,
-          borderColor: primary + '40',
-          paddingHorizontal: 24,
-          paddingVertical: 12,
-          borderRadius: 8,
-          marginHorizontal: 16,
-          marginVertical: 16,
-          alignItems: 'center',
-        }}>
-        <Text style={{color: primary, fontSize: 16, fontWeight: '600'}}>
-          More Results ({nextBatchSize} providers)
-        </Text>
-      </TouchableOpacity>
-    );
-  }, [isAllLoaded, hasMoreResults, loadMoreResults, primary, searchData, loading, visibleBatches]);
-
   return (
-    <SafeAreaView style={{backgroundColor: 'black', flex: 1, width: '100%'}}>
+    <SafeAreaView className="bg-black h-full w-full">
       <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={{marginTop: 56, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12}}>
-          <Text style={{color: 'white', fontSize: 24, fontWeight: '600'}}>
+        <View className="mt-14 px-4 flex flex-row justify-between items-center gap-x-3">
+          <Text className="text-white text-2xl font-semibold ">
             {isAllLoaded ? 'Searched for' : 'Searching for'}{' '}
             <Text style={{color: primary}}>"{debouncedFilter}"</Text>
           </Text>
           {loadingIndicator}
         </View>
 
-        <View style={{paddingHorizontal: 16}}>
+        <View className="px-4">
           {combinedData.length > 0 ? (
             <FlatList
               data={combinedData}
@@ -389,31 +327,30 @@ const SearchResults = React.memo(({route}: Props): React.ReactElement => {
               renderItem={renderItem}
               showsVerticalScrollIndicator={false}
               removeClippedSubviews={true}
-              maxToRenderPerBatch={2}
-              windowSize={3}
-              initialNumToRender={1}
+              maxToRenderPerBatch={2} // Reduced for better performance
+              windowSize={3} // Reduced for better performance
+              initialNumToRender={1} // Reduced for faster initial render
               getItemLayout={(data, index) => ({
-                length: 280,
+                length: 280, // Slightly reduced height estimate
                 offset: 280 * index,
                 index,
               })}
+              // Add performance optimizations
               updateCellsBatchingPeriod={50}
               contentInsetAdjustmentBehavior="automatic"
             />
           ) : (
             isAllLoaded && (
-              <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 80}}>
-                <Text style={{color: 'white', fontSize: 18}}>No results found</Text>
-                <Text style={{color: '#9CA3AF', fontSize: 14, marginTop: 8}}>
+              <View className="flex-1 justify-center items-center mt-20">
+                <Text className="text-white text-lg">No results found</Text>
+                <Text className="text-gray-400 text-sm mt-2">
                   Try searching with different keywords
                 </Text>
               </View>
             )
           )}
-
-          {moreResultsButton}
         </View>
-        <View style={{height: 64}} />
+        <View className="h-16" />
       </ScrollView>
     </SafeAreaView>
   );
